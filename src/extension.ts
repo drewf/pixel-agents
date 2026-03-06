@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
 import { PixelAgentsViewProvider } from './PixelAgentsViewProvider.js';
 import { VIEW_ID, COMMAND_SHOW_PANEL, COMMAND_EXPORT_DEFAULT_LAYOUT } from './constants.js';
+import { initLogger, log } from './logger.js';
 
 let providerInstance: PixelAgentsViewProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
+	initLogger();
+	log('Extension activating');
 	const provider = new PixelAgentsViewProvider(context);
 	providerInstance = provider;
 
