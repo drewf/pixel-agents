@@ -6,6 +6,9 @@ export const TOOL_DONE_DELAY_MS = 300;
 export const PERMISSION_TIMER_DELAY_MS = 7000;
 export const TEXT_IDLE_DELAY_MS = 5000;
 
+export const STALE_AGENT_TIMEOUT_MS = 300_000; // 5 minutes
+export const STALE_AGENT_CHECK_INTERVAL_MS = 30_000;
+
 // ── Display Truncation ──────────────────────────────────────
 export const BASH_COMMAND_DISPLAY_MAX_LENGTH = 30;
 export const TASK_DESCRIPTION_DISPLAY_MAX_LENGTH = 40;

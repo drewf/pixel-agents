@@ -13,6 +13,7 @@ import {
 	getProjectDirPath,
 } from './agentManager.js';
 import { ensureProjectScan } from './fileWatcher.js';
+import { startStaleAgentCheck } from './staleAgentChecker.js';
 import { loadFurnitureAssets, sendAssetsToWebview, loadFloorTiles, sendFloorTilesToWebview, loadWallTiles, sendWallTilesToWebview, loadCharacterSprites, sendCharacterSpritesToWebview, loadDefaultLayout } from './assetLoader.js';
 import { WORKSPACE_KEY_AGENT_SEATS, GLOBAL_KEY_SOUND_ENABLED } from './constants.js';
 import { writeLayoutToFile, readLayoutFromFile, watchLayoutFile } from './layoutPersistence.js';
@@ -38,6 +39,9 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 
 	// Bundled default layout (loaded from assets/default-layout.json)
 	defaultLayout: Record<string, unknown> | null = null;
+
+	// Stale agent cleanup
+	staleCheckTimer: ReturnType<typeof setInterval> | null = null;
 
 	// Cross-window layout sync
 	layoutWatcher: LayoutWatcher | null = null;
@@ -224,6 +228,15 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 					})();
 				}
 				sendExistingAgents(this.agents, this.context, this.webview);
+
+				// Start stale agent cleanup
+				if (!this.staleCheckTimer) {
+					this.staleCheckTimer = startStaleAgentCheck(
+						this.agents,
+						this.fileWatchers, this.pollingTimers, this.waitingTimers, this.permissionTimers,
+						this.jsonlPollTimers, this.webview, this.persistAgents,
+					);
+				}
 			} else if (message.type === 'openSessionsFolder') {
 				const projectDir = getProjectDirPath();
 				if (projectDir && fs.existsSync(projectDir)) {
@@ -322,6 +335,10 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	dispose() {
+		if (this.staleCheckTimer) {
+			clearInterval(this.staleCheckTimer);
+			this.staleCheckTimer = null;
+		}
 		this.layoutWatcher?.dispose();
 		this.layoutWatcher = null;
 		for (const id of [...this.agents.keys()]) {
