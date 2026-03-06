@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { vscode } from '../vscodeApi.js'
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js'
+import { isHooksInstalled, onHooksStatusChange } from '../hooksState.js'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -27,6 +28,11 @@ const menuItemBase: React.CSSProperties = {
 export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode }: SettingsModalProps) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled)
+  const [hooksLocal, setHooksLocal] = useState(isHooksInstalled)
+
+  useEffect(() => {
+    return onHooksStatusChange(setHooksLocal)
+  }, [])
 
   if (!isOpen) return null
 
@@ -189,6 +195,43 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
               }}
             />
           )}
+        </button>
+        {/* Separator */}
+        <div style={{ borderTop: '1px solid var(--pixel-border)', margin: '4px 0' }} />
+        <button
+          onClick={() => {
+            if (hooksLocal) {
+              vscode.postMessage({ type: 'uninstallHooks' })
+            } else {
+              vscode.postMessage({ type: 'installHooks' })
+            }
+          }}
+          onMouseEnter={() => setHovered('hooks')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...menuItemBase,
+            background: hovered === 'hooks' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+          }}
+        >
+          <span>Claude Code Hooks</span>
+          <span
+            style={{
+              width: 14,
+              height: 14,
+              border: '2px solid rgba(255, 255, 255, 0.5)',
+              borderRadius: 0,
+              background: hooksLocal ? 'rgba(90, 140, 255, 0.8)' : 'transparent',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px',
+              lineHeight: 1,
+              color: '#fff',
+            }}
+          >
+            {hooksLocal ? 'X' : ''}
+          </span>
         </button>
       </div>
     </>

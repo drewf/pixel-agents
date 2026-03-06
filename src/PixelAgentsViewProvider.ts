@@ -13,6 +13,8 @@ import {
 	getProjectDirPath,
 } from './agentManager.js';
 import { ensureProjectScan } from './fileWatcher.js';
+import { onHookEvent } from './hookEventWatcher.js';
+import { installHooks, uninstallHooks, areHooksInstalled } from './hooksInstaller.js';
 import { loadFurnitureAssets, sendAssetsToWebview, loadFloorTiles, sendFloorTilesToWebview, loadWallTiles, sendWallTilesToWebview, loadCharacterSprites, sendCharacterSpritesToWebview, loadDefaultLayout } from './assetLoader.js';
 import { WORKSPACE_KEY_AGENT_SEATS, GLOBAL_KEY_SOUND_ENABLED } from './constants.js';
 import { writeLayoutToFile, readLayoutFromFile, watchLayoutFile } from './layoutPersistence.js';
@@ -38,6 +40,9 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 
 	// Bundled default layout (loaded from assets/default-layout.json)
 	defaultLayout: Record<string, unknown> | null = null;
+
+	// Claude Code hooks integration
+	hookEventUnsub: (() => void) | null = null;
 
 	// Cross-window layout sync
 	layoutWatcher: LayoutWatcher | null = null;
@@ -90,6 +95,20 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 				writeLayoutToFile(message.layout as Record<string, unknown>);
 			} else if (message.type === 'setSoundEnabled') {
 				this.context.globalState.update(GLOBAL_KEY_SOUND_ENABLED, message.enabled);
+			} else if (message.type === 'installHooks') {
+				const ok = installHooks(this.extensionUri.fsPath);
+				this.webview?.postMessage({ type: 'hooksStatus', installed: ok });
+				if (ok) {
+					this.startHookEventWatcher();
+				}
+			} else if (message.type === 'uninstallHooks') {
+				const ok = uninstallHooks();
+				this.webview?.postMessage({ type: 'hooksStatus', installed: !ok });
+				if (ok) {
+					this.stopHookEventWatcher();
+				}
+			} else if (message.type === 'getHooksStatus') {
+				this.webview?.postMessage({ type: 'hooksStatus', installed: areHooksInstalled() });
 			} else if (message.type === 'webviewReady') {
 				restoreAgents(
 					this.context,
@@ -224,6 +243,13 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 					})();
 				}
 				sendExistingAgents(this.agents, this.context, this.webview);
+
+				// Send hooks status and auto-start watcher if installed
+				const hooksInstalled = areHooksInstalled();
+				this.webview?.postMessage({ type: 'hooksStatus', installed: hooksInstalled });
+				if (hooksInstalled) {
+					this.startHookEventWatcher();
+				}
 			} else if (message.type === 'openSessionsFolder') {
 				const projectDir = getProjectDirPath();
 				if (projectDir && fs.existsSync(projectDir)) {
@@ -313,6 +339,21 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 		vscode.window.showInformationMessage(`Pixel Agents: Default layout exported to ${targetPath}`);
 	}
 
+	private startHookEventWatcher(): void {
+		if (this.hookEventUnsub) return;
+		this.hookEventUnsub = onHookEvent('*', (signal) => {
+			// Forward hook events to webview for future use
+			this.webview?.postMessage({ type: 'hookEvent', ...signal });
+		});
+	}
+
+	private stopHookEventWatcher(): void {
+		if (this.hookEventUnsub) {
+			this.hookEventUnsub();
+			this.hookEventUnsub = null;
+		}
+	}
+
 	private startLayoutWatcher(): void {
 		if (this.layoutWatcher) return;
 		this.layoutWatcher = watchLayoutFile((layout) => {
@@ -335,6 +376,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 			clearInterval(this.projectScanTimer.current);
 			this.projectScanTimer.current = null;
 		}
+		this.stopHookEventWatcher();
 	}
 }
 

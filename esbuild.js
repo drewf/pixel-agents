@@ -27,6 +27,22 @@ function copyAssets() {
 }
 
 /**
+ * Copy hooks folder to dist/hooks (Claude Code hook scripts)
+ */
+function copyHooks() {
+	const srcDir = path.join(__dirname, 'src', 'hooks');
+	const dstDir = path.join(__dirname, 'dist', 'hooks');
+
+	if (fs.existsSync(srcDir)) {
+		if (fs.existsSync(dstDir)) {
+			fs.rmSync(dstDir, { recursive: true });
+		}
+		fs.cpSync(srcDir, dstDir, { recursive: true });
+		console.log('✓ Copied hooks/ → dist/hooks/');
+	}
+}
+
+/**
  * @type {import('esbuild').Plugin}
  */
 const esbuildProblemMatcherPlugin = {
@@ -70,8 +86,9 @@ async function main() {
 	} else {
 		await ctx.rebuild();
 		await ctx.dispose();
-		// Copy assets after build
+		// Copy assets and hooks after build
 		copyAssets();
+		copyHooks();
 	}
 }
 

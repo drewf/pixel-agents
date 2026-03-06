@@ -9,6 +9,7 @@ import { setWallSprites } from '../office/wallTiles.js'
 import { setCharacterTemplates } from '../office/sprites/spriteData.js'
 import { vscode } from '../vscodeApi.js'
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js'
+import { setHooksInstalled } from '../hooksState.js'
 
 export interface SubagentCharacter {
   id: number
@@ -342,6 +343,10 @@ export function useExtensionMessages(
       } else if (msg.type === 'settingsLoaded') {
         const soundOn = msg.soundEnabled as boolean
         setSoundEnabled(soundOn)
+      } else if (msg.type === 'hooksStatus') {
+        setHooksInstalled(msg.installed as boolean)
+      } else if (msg.type === 'hookEvent') {
+        console.log(`[Webview] Hook event: ${msg.event}`, msg)
       } else if (msg.type === 'furnitureAssetsLoaded') {
         try {
           const catalog = msg.catalog as FurnitureAsset[]
